@@ -13,7 +13,6 @@ import re
 import logging
 import traceback
 import pdb
-import tqdm
 from warnings import warn
 
 GM_WEBPAGE = 'https://www.google.com/maps/'

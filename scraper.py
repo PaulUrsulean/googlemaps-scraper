@@ -3,6 +3,7 @@ from googlemaps import GoogleMapsScraper
 from datetime import datetime, timedelta
 import argparse
 import pandas as pd
+from tqdm import tqdm
 
 HEADER = ['id_review', 'caption', 'rating', 'username', 'url_user']
 
@@ -45,7 +46,7 @@ if __name__ == '__main__':
                             pbar.close()
                                 
     except:
-        if len(df) > 0: print("Error encountered, dumping partial csv: {}".format(df.to_csv()))
+        if len(df) > 0: print("Error encountered, dumping partial csv: {}".format(df.to_csv(index=False)))
         raise
     
-    df.to_csv(args.csv_path)
+    df.to_csv(args.csv_path, index=False)
