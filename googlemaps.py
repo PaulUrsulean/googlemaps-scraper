@@ -12,6 +12,9 @@ import time
 import re
 import logging
 import traceback
+import pdb
+import tqdm
+from warnings import warn
 
 GM_WEBPAGE = 'https://www.google.com/maps/'
 MAX_WAIT = 10
@@ -23,6 +26,7 @@ class GoogleMapsScraper:
     def __init__(self, debug=False):
         self.debug = debug
         self.driver = self.__get_driver()
+        self.driver.implicitly_wait(5)
         self.logger = self.__get_logger()
 
     def __enter__(self):
@@ -44,26 +48,27 @@ class GoogleMapsScraper:
         # open dropdown menu
         clicked = False
         tries = 0
+        
         while not clicked and tries < MAX_RETRY:
+            
             try:
-                if not self.debug:
-                    menu_bt = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'div.cYrDcjyGO77__container')))
-                else:
-                    menu_bt = wait.until(EC.element_to_be_clickable((By.XPATH, '//button[@data-value=\'Sort\']')))
-                menu_bt.click()
-
+                wait.until(EC.element_to_be_clickable((By.XPATH, "(//button[contains(concat(' ',normalize-space(@class),' '),' gm2-hairline-border ') and contains(concat(' ',normalize-space(@class),' '),' section-action-chip-button ')])[last()]"))).click()
+                
                 clicked = True
                 time.sleep(3)
+                
             except Exception as e:
                 tries += 1
                 self.logger.warn('Failed to click recent button')
+                warn('Failed to click recent button')
+                raise
 
             # failed to open the dropdown
             if tries == MAX_RETRY:
                 return -1
-
+            
         # second element of the list: most recent
-        recent_rating_bt = self.driver.find_elements_by_xpath('//li[@role=\'menuitemradio\']')[1] 
+        recent_rating_bt = self.driver.find_elements_by_css_selector("li.action-menu-entry")[1] 
         recent_rating_bt.click()
 
         # wait to load review (ajax call)
@@ -118,24 +123,10 @@ class GoogleMapsScraper:
             review_text = self.__filter_string(review.find('span', class_='section-review-text').text)
         except Exception as e:
             review_text = None
-
-        rating = float(review.find('span', class_='section-review-stars')['aria-label'].split(' ')[1])
+        
+        
+        rating = next(float(c) for c in review.find('span', class_='section-review-stars')['aria-label'] if c.isdigit())
         relative_date = review.find('span', class_='section-review-publish-date').text
-
-        try:
-            n_reviews_photos = review.find('div', class_='section-review-subtitle').find_all('span')[1].text
-            metadata = n_reviews_photos.split('\xe3\x83\xbb')
-            if len(metadata) == 3:
-                n_photos = int(metadata[2].split(' ')[0].replace('.', ''))
-            else:
-                n_photos = 0
-
-            idx = len(metadata)
-            n_reviews = int(metadata[idx - 1].split(' ')[0].replace('.', ''))
-
-        except Exception as e:
-            n_reviews = 0
-            n_photos = 0
 
         user_url = review.find('a')['href']
 
@@ -151,8 +142,6 @@ class GoogleMapsScraper:
         item['retrieval_date'] = datetime.now()
         item['rating'] = rating
         item['username'] = username
-        item['n_review_user'] = n_reviews
-        item['n_photo_user'] = n_photos
         item['url_user'] = user_url
 
         return item
@@ -203,8 +192,8 @@ class GoogleMapsScraper:
 
     def __get_driver(self, debug=False):
         options = Options()
-        if not self.debug:
-            options.add_argument("--headless")
+#         if not self.debug:
+        options.add_argument("--headless")
         options.add_argument("--window-size=1366,768")
         options.add_argument("--disable-notifications")
         options.add_experimental_option('prefs', {'intl.accept_languages': 'en_GB'})

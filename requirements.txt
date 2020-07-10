@@ -1,2 +1,4 @@
 beautifulsoup4==4.6.0
 selenium==3.14.0
+pandas
+tqdm
